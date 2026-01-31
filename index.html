@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Get-Save | v2.6.0</title>
+    <title>Get-Save | v2.7.0</title>
     <style>
         :root {
             --bg: #030712;
@@ -119,10 +119,9 @@
             font-size: 17px;
             font-weight: 700;
             cursor: pointer;
-            transition: opacity 0.3s;
         }
 
-        button:disabled { opacity: 0.6; cursor: wait; }
+        button:disabled { opacity: 0.6; }
 
         #result {
             display: none;
@@ -144,44 +143,33 @@
             font-weight: bold;
         }
 
-        #status { margin-top: 15px; font-size: 13px; color: var(--text-dim); min-height: 20px; line-height: 1.5; }
-        
-        .error-btn {
-            background: #374151;
-            margin-top: 10px;
-            font-size: 12px;
-            padding: 10px;
-            border-radius: 8px;
-            color: #fff;
-            cursor: pointer;
-            border: none;
-        }
+        #status { margin-top: 15px; font-size: 13px; color: var(--text-dim); min-height: 20px; }
     </style>
 </head>
 <body>
 
-    <div class="version-tag">v2.6.0</div>
+    <div class="version-tag">v2.7.0</div>
 
     <div class="container">
         <h1>Get-Save</h1>
-        <div class="subtitle">Улучшенная стабильность</div>
+        <div class="subtitle">Используем доверенный мост</div>
 
         <div class="selector-container">
             <div id="slider" class="slider"></div>
-            <div class="option active" onclick="setMode(0)">Cobalt</div>
-            <div class="option" onclick="setMode(1)">Mirror</div>
+            <div class="option active" onclick="setMode(0)">Trust Bridge</div>
+            <div class="option" onclick="setMode(1)">Direct</div>
             <div class="option" onclick="setMode(2)">SafeMode</div>
         </div>
 
-        <input type="text" id="urlInput" placeholder="Вставьте ссылку...">
+        <input type="text" id="urlInput" placeholder="Вставьте ссылку (youtu.be)...">
 
-        <button id="mainBtn" onclick="handleAction()">СКАЧАТЬ</button>
+        <button id="mainBtn" onclick="handleAction()">ПОЛУЧИТЬ ФАЙЛ</button>
 
         <div id="status"></div>
 
         <div id="result">
-            <div style="font-weight: bold; color: var(--success);">Файл найден!</div>
-            <a id="dlLink" href="#" target="_blank" class="dl-link">СОХРАНИТЬ ВИДЕО</a>
+            <div style="font-weight: bold; color: var(--success);">Видео успешно найдено!</div>
+            <a id="dlLink" href="#" target="_blank" class="dl-link">СКАЧАТЬ ВИДЕО</a>
         </div>
     </div>
 
@@ -195,39 +183,40 @@
                 opt.classList.toggle('active', idx === m);
             });
             document.getElementById('result').style.display = 'none';
-            document.getElementById('status').innerHTML = '';
+            document.getElementById('status').innerText = '';
         }
 
         async function handleAction() {
-            const url = document.getElementById('urlInput').value.trim();
+            let url = document.getElementById('urlInput').value.trim();
             const status = document.getElementById('status');
             const result = document.getElementById('result');
             const btn = document.getElementById('mainBtn');
 
             if (!url) return;
 
+            // Преобразование youtu.be в полную ссылку для лучшей совместимости
+            if (url.includes('youtu.be/')) {
+                const id = url.split('/').pop().split('?')[0];
+                url = `https://www.youtube.com/watch?v=${id}`;
+            }
+
             btn.disabled = true;
-            status.innerHTML = "Пытаемся обойти защиту...<br><small>Это может занять до 15 секунд</small>";
+            status.innerText = "Устанавливаем защищенное соединение...";
             status.style.color = "var(--text-dim)";
             result.style.display = "none";
 
             if (mode < 2) {
-                // Пытаемся использовать разные точки входа Cobalt
-                const apiList = [
-                    'https://api.cobalt.tools/api/json',
-                    'https://cobalt.api.unblocker.it/api/json',
-                    'https://api.vve.cc/api/json'
-                ];
+                // Используем прокси-посредник для обхода блокировок CORS
+                const proxy = mode === 0 ? 'https://corsproxy.io/?' : '';
+                const api = 'https://api.cobalt.tools/api/json';
                 
-                let success = false;
-                
-                // Пробуем сервера по очереди
-                const targetApi = mode === 0 ? apiList[0] : apiList[1];
-
                 try {
-                    const response = await fetch(targetApi, {
+                    const response = await fetch(proxy + encodeURIComponent(api), {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
                         body: JSON.stringify({ url: url, vQuality: "720" })
                     });
 
@@ -237,17 +226,15 @@
                         document.getElementById('dlLink').href = data.url;
                         result.style.display = "block";
                         status.innerText = "Готово!";
-                        success = true;
+                    } else {
+                        throw new Error();
                     }
                 } catch (e) {
-                    console.error("Server error");
-                }
-
-                if (!success) {
-                    status.innerHTML = "<span style='color:var(--error)'>Все серверы перегружены.</span><br>Попробуйте режим SafeMode или подождите.";
+                    status.innerText = "Сервер отклонил запрос. Попробуйте SafeMode.";
+                    status.style.color = "var(--error)";
                 }
             } else {
-                status.innerText = "Инициализация SafeMode...";
+                status.innerText = "Переход на SafeMode...";
                 const cleanUrl = url.replace(/https?:\/\//, '');
                 window.open(`https://ru.savefrom.net/#url=http://${cleanUrl}`, '_blank');
             }
