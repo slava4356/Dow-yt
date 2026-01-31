@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Get-Save | Финальная версия</title>
+    <title>Get-Save | Выбор API</title>
     <style>
         :root {
             --bg: #020617;
             --card: #0f172a;
             --primary: #0ea5e9;
             --text: #f8fafc;
-            --error: #f43f5e;
+            --text-dim: #94a3b8;
             --success: #10b981;
         }
 
@@ -18,7 +18,7 @@
             margin: 0;
             background-color: var(--bg);
             color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, system-ui, sans-serif;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -30,7 +30,7 @@
             width: 100%;
             max-width: 400px;
             background: var(--card);
-            padding: 35px 25px;
+            padding: 30px 25px;
             border-radius: 28px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
             border: 1px solid rgba(255, 255, 255, 0.05);
@@ -38,22 +38,52 @@
         }
 
         h1 {
-            font-size: 32px;
-            font-weight: 800;
             margin: 0 0 10px;
-            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            font-size: 28px;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        .subtitle {
-            font-size: 14px;
-            color: #94a3b8;
-            margin-bottom: 30px;
+        /* Стили переключателя */
+        .api-selector {
+            background: #1e293b;
+            padding: 5px;
+            border-radius: 12px;
+            display: flex;
+            margin-bottom: 25px;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
         }
 
-        .input-wrapper {
-            margin-bottom: 20px;
+        .api-option {
+            flex: 1;
+            padding: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 1;
+            transition: color 0.3s;
+            color: var(--text-dim);
+        }
+
+        .api-option.active {
+            color: white;
+        }
+
+        .slider {
+            position: absolute;
+            width: calc(50% - 5px);
+            height: calc(100% - 10px);
+            background: var(--primary);
+            border-radius: 8px;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            top: 5px;
+            left: 5px;
+        }
+
+        .slider.right {
+            transform: translateX(100%);
         }
 
         input {
@@ -62,16 +92,11 @@
             background: #1e293b;
             border: 2px solid #334155;
             border-radius: 14px;
-            color: #fff;
+            color: white;
             font-size: 16px;
             box-sizing: border-box;
             outline: none;
-            transition: border-color 0.3s, box-shadow 0.3s;
-        }
-
-        input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 15px rgba(14, 165, 233, 0.2);
+            margin-bottom: 20px;
         }
 
         button {
@@ -80,146 +105,129 @@
             background: var(--primary);
             border: none;
             border-radius: 14px;
-            color: #fff;
+            color: white;
             font-size: 16px;
             font-weight: 700;
             cursor: pointer;
-            transition: transform 0.2s, opacity 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
+            transition: 0.2s;
         }
 
         button:active { transform: scale(0.98); }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .loader {
-            display: none;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,0.2);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
+        button:disabled { opacity: 0.6; }
 
         #result {
             display: none;
-            margin-top: 25px;
+            margin-top: 20px;
             padding: 20px;
             background: rgba(16, 185, 129, 0.1);
             border: 1px dashed var(--success);
             border-radius: 18px;
-            animation: fadeIn 0.4s ease-out;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .download-btn {
+        .dl-link {
             display: block;
-            margin-top: 15px;
-            padding: 14px;
+            margin-top: 10px;
+            padding: 12px;
             background: var(--success);
-            color: #fff;
+            color: white;
             text-decoration: none;
-            border-radius: 12px;
-            font-weight: 700;
+            border-radius: 10px;
+            font-weight: bold;
         }
 
-        #error-msg {
-            display: none;
-            margin-top: 15px;
-            color: var(--error);
-            font-size: 13px;
-            line-height: 1.4;
-        }
+        .status { margin-top: 15px; font-size: 13px; color: var(--text-dim); }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h1>Get-Save</h1>
-        <div class="subtitle">Поддержка youtu.be, YouTube, TikTok и др.</div>
+        <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 20px;">Выберите метод загрузки:</p>
 
-        <div class="input-wrapper">
-            <input type="text" id="urlInput" placeholder="Вставьте ссылку здесь...">
+        <!-- Ползунок выбора API -->
+        <div class="api-selector" onclick="toggleApi()">
+            <div id="slider" class="slider"></div>
+            <div id="opt1" class="api-option active">Cobalt (Прямой)</div>
+            <div id="opt2" class="api-option">SaveFrom (Резерв)</div>
         </div>
 
-        <button id="actionBtn" onclick="process()">
-            <span id="btnText">СКАЧАТЬ</span>
-            <div id="loader" class="loader"></div>
-        </button>
+        <input type="text" id="urlInput" placeholder="Вставьте ссылку (youtu.be...)">
 
-        <div id="error-msg"></div>
+        <button id="mainBtn" onclick="handleAction()">НАЧАТЬ</button>
+
+        <div id="status" class="status"></div>
 
         <div id="result">
-            <div style="font-weight: bold; color: var(--success);">Видео успешно найдено!</div>
-            <a id="fileLink" href="#" target="_blank" class="download-btn">СОХРАНИТЬ MP4</a>
+            <div style="font-weight: bold; color: var(--success); margin-bottom: 10px;">Файл найден!</div>
+            <a id="dlLink" href="#" target="_blank" class="dl-link">СКАЧАТЬ ВИДЕО</a>
         </div>
     </div>
 
     <script>
-        async function process() {
-            const input = document.getElementById('urlInput');
-            const btn = document.getElementById('actionBtn');
-            const btnText = document.getElementById('btnText');
-            const loader = document.getElementById('loader');
-            const result = document.getElementById('result');
-            const error = document.getElementById('error-msg');
-            const fileLink = document.getElementById('fileLink');
+        let currentApi = 'cobalt'; // По умолчанию Cobalt
 
-            let url = input.value.trim();
+        function toggleApi() {
+            const slider = document.getElementById('slider');
+            const opt1 = document.getElementById('opt1');
+            const opt2 = document.getElementById('opt2');
+            
+            if (currentApi === 'cobalt') {
+                currentApi = 'savefrom';
+                slider.classList.add('right');
+                opt1.classList.remove('active');
+                opt2.classList.add('active');
+            } else {
+                currentApi = 'cobalt';
+                slider.classList.remove('right');
+                opt1.classList.add('active');
+                opt2.classList.remove('active');
+            }
+        }
+
+        async function handleAction() {
+            const input = document.getElementById('urlInput');
+            const url = input.value.trim();
+            const btn = document.getElementById('mainBtn');
+            const status = document.getElementById('status');
+            const result = document.getElementById('result');
+            const dlLink = document.getElementById('dlLink');
+
             if (!url) return;
 
-            // Сброс UI
-            btn.disabled = true;
-            btnText.innerText = "ОБРАБОТКА...";
-            loader.style.display = "block";
+            status.innerText = "Обработка...";
             result.style.display = "none";
-            error.style.display = "none";
+            btn.disabled = true;
 
-            try {
-                // Отправка запроса на API Cobalt
-                const response = await fetch('https://api.cobalt.tools/api/json', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        url: url,
-                        vQuality: "720",
-                        isNoAudio: false
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.url) {
-                    fileLink.href = data.url;
-                    result.style.display = "block";
-                    btnText.innerText = "ГОТОВО";
-                } else if (data.status === 'error') {
-                    throw new Error(data.text || "Сервер не смог обработать ссылку");
-                } else {
-                    throw new Error("Не удалось получить видео");
+            if (currentApi === 'cobalt') {
+                // Логика Cobalt (прямое получение ссылки)
+                try {
+                    const response = await fetch('https://api.cobalt.tools/api/json', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify({ url: url, vQuality: "720" })
+                    });
+                    const data = await response.json();
+                    if (data.url) {
+                        dlLink.href = data.url;
+                        result.style.display = "block";
+                        status.innerText = "Готово!";
+                    } else {
+                        status.innerText = "Ошибка: Cobalt не смог найти видео.";
+                    }
+                } catch (e) {
+                    status.innerText = "Ошибка сети. Попробуйте SaveFrom.";
                 }
-
-            } catch (err) {
-                error.innerText = "Ошибка: Ссылка " + (url.includes('youtu.be') ? "youtu.be" : "") + " временно не поддерживается сервером или он перегружен. Попробуйте еще раз.";
-                error.style.display = "block";
-                btnText.innerText = "ОШИБКА";
-            } finally {
-                btn.disabled = false;
-                setTimeout(() => { if(btnText.innerText !== "ГОТОВО") btnText.innerText = "СКАЧАТЬ"; }, 2000);
-                loader.style.display = "none";
+            } else {
+                // Логика SaveFrom (перенаправление)
+                status.innerText = "Переход на SaveFrom...";
+                setTimeout(() => {
+                    const cleanUrl = url.replace('https://', '').replace('http://', '');
+                    window.open(`https://ru.savefrom.net/#url=http://${cleanUrl}`, '_blank');
+                    status.innerText = "Открыто в новой вкладке.";
+                }, 1000);
             }
+
+            btn.disabled = false;
         }
     </script>
 </body>
