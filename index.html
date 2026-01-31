@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Get-Save | v2.7.0</title>
+    <title>Get-Save | v2.8.0</title>
     <style>
         :root {
             --bg: #030712;
@@ -86,7 +86,7 @@
 
         .slider {
             position: absolute;
-            width: calc(33.33% - 4px);
+            width: calc(50% - 4px);
             height: calc(100% - 8px);
             background: var(--primary);
             border-radius: 12px;
@@ -95,6 +95,8 @@
             left: 4px;
             z-index: 1;
         }
+
+        .slider.right { transform: translateX(100%); }
 
         input {
             width: 100%;
@@ -121,122 +123,137 @@
             cursor: pointer;
         }
 
-        button:disabled { opacity: 0.6; }
-
-        #result {
+        #result, #alt-option {
             display: none;
             margin-top: 25px;
             padding: 20px;
-            background: rgba(16, 185, 129, 0.08);
-            border: 1px solid var(--success);
             border-radius: 20px;
+            animation: fadeIn 0.3s ease;
         }
 
-        .dl-link {
+        #result { background: rgba(16, 185, 129, 0.08); border: 1px solid var(--success); }
+        #alt-option { background: rgba(239, 68, 68, 0.08); border: 1px solid var(--error); }
+
+        .dl-link, .alt-link {
             display: block;
             margin-top: 12px;
             padding: 14px;
-            background: var(--success);
             color: white;
             text-decoration: none;
             border-radius: 12px;
             font-weight: bold;
         }
 
+        .dl-link { background: var(--success); }
+        .alt-link { background: var(--primary); }
+
         #status { margin-top: 15px; font-size: 13px; color: var(--text-dim); min-height: 20px; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <div class="version-tag">v2.7.0</div>
+    <div class="version-tag">v2.8.0</div>
 
     <div class="container">
         <h1>Get-Save</h1>
-        <div class="subtitle">Используем доверенный мост</div>
+        <div class="subtitle">Версия с авто-подбором</div>
 
-        <div class="selector-container">
+        <div class="selector-container" onclick="toggleMode()">
             <div id="slider" class="slider"></div>
-            <div class="option active" onclick="setMode(0)">Trust Bridge</div>
-            <div class="option" onclick="setMode(1)">Direct</div>
-            <div class="option" onclick="setMode(2)">SafeMode</div>
+            <div id="opt-fast" class="option active">Быстрый (API)</div>
+            <div id="opt-safe" class="option">Надежный (Safe)</div>
         </div>
 
-        <input type="text" id="urlInput" placeholder="Вставьте ссылку (youtu.be)...">
+        <input type="text" id="urlInput" placeholder="Вставьте ссылку...">
 
-        <button id="mainBtn" onclick="handleAction()">ПОЛУЧИТЬ ФАЙЛ</button>
+        <button id="mainBtn" onclick="handleAction()">НАЧАТЬ</button>
 
         <div id="status"></div>
 
+        <!-- Результат для API -->
         <div id="result">
-            <div style="font-weight: bold; color: var(--success);">Видео успешно найдено!</div>
-            <a id="dlLink" href="#" target="_blank" class="dl-link">СКАЧАТЬ ВИДЕО</a>
+            <div style="font-weight: bold; color: var(--success);">Видео найдено!</div>
+            <a id="dlLink" href="#" target="_blank" class="dl-link">СКАЧАТЬ MP4</a>
+        </div>
+
+        <!-- Предложение альтернативы при ошибке -->
+        <div id="alt-option">
+            <div style="font-weight: bold; color: var(--error); margin-bottom: 10px;">API временно недоступен</div>
+            <div style="font-size: 12px; margin-bottom: 15px;">Используйте надежный метод для этой ссылки:</div>
+            <button class="alt-link" style="width:100%" onclick="openSafeMode()">ОТКРЫТЬ ЧЕРЕЗ SAFE</button>
         </div>
     </div>
 
     <script>
-        let mode = 0; 
+        let isSafeMode = false;
 
-        function setMode(m) {
-            mode = m;
-            document.getElementById('slider').style.transform = `translateX(${m * 100}%)`;
-            document.querySelectorAll('.option').forEach((opt, idx) => {
-                opt.classList.toggle('active', idx === m);
-            });
+        function toggleMode() {
+            isSafeMode = !isSafeMode;
+            document.getElementById('slider').classList.toggle('right', isSafeMode);
+            document.getElementById('opt-fast').classList.toggle('active', !isSafeMode);
+            document.getElementById('opt-safe').classList.toggle('active', isSafeMode);
+            resetUI();
+        }
+
+        function resetUI() {
             document.getElementById('result').style.display = 'none';
+            document.getElementById('alt-option').style.display = 'none';
             document.getElementById('status').innerText = '';
         }
 
+        function openSafeMode() {
+            const url = document.getElementById('urlInput').value.trim();
+            const cleanUrl = url.replace(/https?:\/\//, '');
+            window.open(`https://ru.savefrom.net/#url=http://${cleanUrl}`, '_blank');
+        }
+
         async function handleAction() {
-            let url = document.getElementById('urlInput').value.trim();
+            const urlInput = document.getElementById('urlInput');
+            let url = urlInput.value.trim();
             const status = document.getElementById('status');
-            const result = document.getElementById('result');
             const btn = document.getElementById('mainBtn');
 
             if (!url) return;
+            resetUI();
 
-            // Преобразование youtu.be в полную ссылку для лучшей совместимости
-            if (url.includes('youtu.be/')) {
-                const id = url.split('/').pop().split('?')[0];
-                url = `https://www.youtube.com/watch?v=${id}`;
+            if (isSafeMode) {
+                openSafeMode();
+                return;
             }
 
             btn.disabled = true;
-            status.innerText = "Устанавливаем защищенное соединение...";
-            status.style.color = "var(--text-dim)";
-            result.style.display = "none";
+            status.innerText = "Запрос к ядру...";
+            
+            // Пробуем несколько API по очереди
+            const apis = [
+                'https://api.cobalt.tools/api/json',
+                'https://cobalt.api.unblocker.it/api/json'
+            ];
 
-            if (mode < 2) {
-                // Используем прокси-посредник для обхода блокировок CORS
-                const proxy = mode === 0 ? 'https://corsproxy.io/?' : '';
-                const api = 'https://api.cobalt.tools/api/json';
-                
+            let found = false;
+            for (let api of apis) {
                 try {
-                    const response = await fetch(proxy + encodeURIComponent(api), {
+                    const res = await fetch(api, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        },
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                         body: JSON.stringify({ url: url, vQuality: "720" })
                     });
-
-                    const data = await response.json();
-                    
+                    const data = await res.json();
                     if (data.url) {
                         document.getElementById('dlLink').href = data.url;
-                        result.style.display = "block";
+                        document.getElementById('result').style.display = 'block';
                         status.innerText = "Готово!";
-                    } else {
-                        throw new Error();
+                        found = true;
+                        break;
                     }
-                } catch (e) {
-                    status.innerText = "Сервер отклонил запрос. Попробуйте SafeMode.";
-                    status.style.color = "var(--error)";
-                }
-            } else {
-                status.innerText = "Переход на SafeMode...";
-                const cleanUrl = url.replace(/https?:\/\//, '');
-                window.open(`https://ru.savefrom.net/#url=http://${cleanUrl}`, '_blank');
+                } catch (e) { continue; }
+            }
+
+            if (!found) {
+                status.innerText = "";
+                document.getElementById('alt-option').style.display = 'block';
             }
             btn.disabled = false;
         }
