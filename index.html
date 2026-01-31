@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Get-Save | v2.5.0</title>
+    <title>Get-Save | v2.5.1</title>
     <style>
         :root {
             --bg: #030712;
@@ -25,11 +25,8 @@
             justify-content: center;
             min-height: 100vh;
             padding: 20px;
-            position: relative;
-            overflow: hidden;
         }
 
-        /* Номер версии в углу */
         .version-tag {
             position: fixed;
             bottom: 15px;
@@ -40,7 +37,6 @@
             padding: 4px 10px;
             border-radius: 20px;
             pointer-events: none;
-            letter-spacing: 0.5px;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
@@ -53,7 +49,6 @@
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.05);
             text-align: center;
-            z-index: 10;
         }
 
         h1 {
@@ -80,7 +75,7 @@
         .option {
             flex: 1;
             padding: 12px 5px;
-            font-size: 12px;
+            font-size: 10px;
             font-weight: 600;
             z-index: 2;
             cursor: pointer;
@@ -100,7 +95,6 @@
             top: 4px;
             left: 4px;
             z-index: 1;
-            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
         }
 
         input {
@@ -114,11 +108,6 @@
             box-sizing: border-box;
             outline: none;
             margin-bottom: 20px;
-            transition: border-color 0.3s ease;
-        }
-
-        input:focus {
-            border-color: var(--primary);
         }
 
         button {
@@ -131,12 +120,7 @@
             font-size: 17px;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.2);
         }
-
-        button:active { transform: scale(0.97); }
-        button:disabled { opacity: 0.6; cursor: wait; }
 
         #result {
             display: none;
@@ -145,12 +129,6 @@
             background: rgba(16, 185, 129, 0.08);
             border: 1px solid var(--success);
             border-radius: 20px;
-            animation: slideUp 0.5s ease;
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .dl-link {
@@ -169,12 +147,11 @@
 </head>
 <body>
 
-    <!-- Нумерация версии -->
-    <div class="version-tag">v2.5.0</div>
+    <div class="version-tag">v2.5.1</div>
 
     <div class="container">
         <h1>Get-Save</h1>
-        <div class="subtitle">Умный доступ к вашим видео</div>
+        <div class="subtitle">Умный выбор сервера</div>
 
         <div class="selector-container">
             <div id="slider" class="slider"></div>
@@ -183,15 +160,15 @@
             <div class="option" onclick="setMode(2)">SaveFrom</div>
         </div>
 
-        <input type="text" id="urlInput" placeholder="Вставьте ссылку здесь...">
+        <input type="text" id="urlInput" placeholder="Вставьте ссылку...">
 
         <button id="mainBtn" onclick="handleAction()">ПОЛУЧИТЬ ФАЙЛ</button>
 
         <div id="status"></div>
 
         <div id="result">
-            <div style="font-weight: bold; color: var(--success);">Файл готов к загрузке</div>
-            <a id="dlLink" href="#" target="_blank" class="dl-link">СКАЧАТЬ ТЕПЕРЬ</a>
+            <div style="font-weight: bold; color: var(--success);">Файл готов!</div>
+            <a id="dlLink" href="#" target="_blank" class="dl-link">СКАЧАТЬ</a>
         </div>
     </div>
 
@@ -200,74 +177,63 @@
 
         function setMode(m) {
             mode = m;
-            const slider = document.getElementById('slider');
-            const options = document.querySelectorAll('.option');
-            
-            slider.style.transform = `translateX(${m * 100}%)`;
-            
-            options.forEach((opt, idx) => {
-                if(idx === m) opt.classList.add('active');
-                else opt.classList.remove('active');
+            document.getElementById('slider').style.transform = `translateX(${m * 100}%)`;
+            document.querySelectorAll('.option').forEach((opt, idx) => {
+                opt.classList.toggle('active', idx === m);
             });
-
             document.getElementById('result').style.display = 'none';
             document.getElementById('status').innerText = '';
         }
 
         async function handleAction() {
-            const input = document.getElementById('urlInput');
-            const url = input.value.trim();
-            const btn = document.getElementById('mainBtn');
+            const url = document.getElementById('urlInput').value.trim();
             const status = document.getElementById('status');
             const result = document.getElementById('result');
-            const dlLink = document.getElementById('dlLink');
+            const btn = document.getElementById('mainBtn');
 
-            if (!url) {
-                status.innerText = "Пожалуйста, вставьте ссылку";
-                status.style.color = "var(--error)";
-                return;
-            }
+            if (!url) return;
 
-            status.innerText = "Подключаем ядро yt-dlp...";
+            btn.disabled = true;
+            status.innerText = "Связь с сервером...";
             status.style.color = "var(--text-dim)";
             result.style.display = "none";
-            btn.disabled = true;
 
-            if (mode === 0 || mode === 1) {
-                // Основные API (Cobalt и AIO)
-                const apiEndpoint = mode === 0 ? 'https://api.cobalt.tools/api/json' : 'https://api.download.yt/api/json';
+            if (mode < 2) {
+                // Пытаемся использовать Cobalt или альтернативный сервер
+                const api = mode === 0 ? 'https://api.cobalt.tools/api/json' : 'https://api.download.yt/api/json';
                 
                 try {
-                    const response = await fetch(apiEndpoint, {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд на ответ
+
+                    const response = await fetch(api, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                        body: JSON.stringify({ url: url, vQuality: "720" })
+                        body: JSON.stringify({ url: url, vQuality: "720" }),
+                        signal: controller.signal
                     });
-                    
+
                     const data = await response.json();
                     
                     if (data.url) {
-                        dlLink.href = data.url;
+                        document.getElementById('dlLink').href = data.url;
                         result.style.display = "block";
-                        status.innerText = "Обработка завершена!";
-                        status.style.color = "var(--success)";
+                        status.innerText = "Готово!";
                     } else {
-                        throw new Error();
+                        status.innerText = "Сервер не нашел видео. Попробуйте SaveFrom.";
+                        status.style.color = "var(--error)";
                     }
                 } catch (e) {
-                    status.innerText = "Сервер занят. Переключите режим.";
+                    status.innerText = "Сервер не отвечает (ошибка сети). Используйте SaveFrom.";
                     status.style.color = "var(--error)";
                 }
             } else {
-                // Режим SaveFrom
-                status.innerText = "Переход на внешний сервис...";
+                status.innerText = "Открываем SaveFrom...";
                 setTimeout(() => {
                     const cleanUrl = url.replace(/https?:\/\//, '');
                     window.open(`https://ru.savefrom.net/#url=http://${cleanUrl}`, '_blank');
-                    status.innerText = "Проверьте новую вкладку.";
-                }, 800);
+                }, 500);
             }
-
             btn.disabled = false;
         }
     </script>
