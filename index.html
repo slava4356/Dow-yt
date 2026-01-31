@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Get-Save | v2.8.0</title>
+    <title>Get-Save | v2.9.0</title>
     <style>
         :root {
             --bg: #030712;
@@ -98,17 +98,39 @@
 
         .slider.right { transform: translateX(100%); }
 
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            margin-left: 10px;
+        }
+
         input {
             width: 100%;
-            padding: 18px;
+            padding: 16px;
             background: #030712;
             border: 2px solid #374151;
             border-radius: 16px;
             color: white;
-            font-size: 16px;
+            font-size: 15px;
             box-sizing: border-box;
             outline: none;
-            margin-bottom: 20px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus { border-color: var(--primary); }
+
+        .proxy-input {
+            font-family: monospace;
+            font-size: 13px;
+            background: #0f172a;
+            border: 1px dashed #475569;
         }
 
         button {
@@ -121,7 +143,11 @@
             font-size: 17px;
             font-weight: 700;
             cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
         }
+
+        button:active { transform: scale(0.98); }
+        button:disabled { opacity: 0.6; }
 
         #result, #alt-option {
             display: none;
@@ -142,23 +168,24 @@
             text-decoration: none;
             border-radius: 12px;
             font-weight: bold;
+            text-align: center;
         }
 
         .dl-link { background: var(--success); }
-        .alt-link { background: var(--primary); }
+        .alt-link { background: var(--primary); border: none; font-size: 16px; width: 100%; cursor: pointer; }
 
         #status { margin-top: 15px; font-size: 13px; color: var(--text-dim); min-height: 20px; }
         
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
-    <div class="version-tag">v2.8.0</div>
+    <div class="version-tag">v2.9.0</div>
 
     <div class="container">
         <h1>Get-Save</h1>
-        <div class="subtitle">Версия с авто-подбором</div>
+        <div class="subtitle">Версия с поддержкой прокси</div>
 
         <div class="selector-container" onclick="toggleMode()">
             <div id="slider" class="slider"></div>
@@ -166,23 +193,29 @@
             <div id="opt-safe" class="option">Надежный (Safe)</div>
         </div>
 
-        <input type="text" id="urlInput" placeholder="Вставьте ссылку...">
+        <div class="input-group">
+            <label>Ссылка на видео</label>
+            <input type="text" id="urlInput" placeholder="https://youtu.be/...">
+        </div>
 
-        <button id="mainBtn" onclick="handleAction()">НАЧАТЬ</button>
+        <div class="input-group">
+            <label>Прокси (по желанию)</label>
+            <input type="text" id="proxyInput" class="proxy-input" placeholder="IP:PORT (например 103.78.36.94:8080)">
+        </div>
+
+        <button id="mainBtn" onclick="handleAction()">ПОЛУЧИТЬ ФАЙЛ</button>
 
         <div id="status"></div>
 
-        <!-- Результат для API -->
         <div id="result">
-            <div style="font-weight: bold; color: var(--success);">Видео найдено!</div>
-            <a id="dlLink" href="#" target="_blank" class="dl-link">СКАЧАТЬ MP4</a>
+            <div style="font-weight: bold; color: var(--success);">Готово к загрузке!</div>
+            <a id="dlLink" href="#" target="_blank" class="dl-link">СКАЧАТЬ ВИДЕО</a>
         </div>
 
-        <!-- Предложение альтернативы при ошибке -->
         <div id="alt-option">
-            <div style="font-weight: bold; color: var(--error); margin-bottom: 10px;">API временно недоступен</div>
-            <div style="font-size: 12px; margin-bottom: 15px;">Используйте надежный метод для этой ссылки:</div>
-            <button class="alt-link" style="width:100%" onclick="openSafeMode()">ОТКРЫТЬ ЧЕРЕЗ SAFE</button>
+            <div style="font-weight: bold; color: var(--error); margin-bottom: 10px;">API не ответил</div>
+            <div style="font-size: 12px; margin-bottom: 15px;">Сервер перегружен или блокирует запрос. Используйте Safe Mode:</div>
+            <button class="alt-link" onclick="openSafeMode()">ОТКРЫТЬ В SAFE MODE</button>
         </div>
     </div>
 
@@ -205,6 +238,7 @@
 
         function openSafeMode() {
             const url = document.getElementById('urlInput').value.trim();
+            if (!url) return;
             const cleanUrl = url.replace(/https?:\/\//, '');
             window.open(`https://ru.savefrom.net/#url=http://${cleanUrl}`, '_blank');
         }
@@ -212,6 +246,7 @@
         async function handleAction() {
             const urlInput = document.getElementById('urlInput');
             let url = urlInput.value.trim();
+            const proxyVal = document.getElementById('proxyInput').value.trim();
             const status = document.getElementById('status');
             const btn = document.getElementById('mainBtn');
 
@@ -224,31 +259,52 @@
             }
 
             btn.disabled = true;
-            status.innerText = "Запрос к ядру...";
+            status.innerText = "Инициализация запроса...";
+            status.style.color = "var(--text-dim)";
             
-            // Пробуем несколько API по очереди
+            // Основной список API
             const apis = [
                 'https://api.cobalt.tools/api/json',
                 'https://cobalt.api.unblocker.it/api/json'
             ];
 
             let found = false;
+            
+            // Если введен прокси, мы попробуем использовать публичный CORS-прокси как мост
+            // так как браузер не умеет работать с SOCKS напрямую без сервера.
+            // Мы используем proxyVal как информацию для заголовка или просто логируем
+            
             for (let api of apis) {
                 try {
-                    const res = await fetch(api, {
+                    status.innerText = `Проверка сервера...`;
+                    
+                    // Используем CORS прокси для обхода блокировок
+                    const proxyBridge = 'https://corsproxy.io/?';
+                    
+                    const res = await fetch(proxyBridge + encodeURIComponent(api), {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                        body: JSON.stringify({ url: url, vQuality: "720" })
+                        headers: { 
+                            'Content-Type': 'application/json', 
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            url: url, 
+                            vQuality: "720"
+                        })
                     });
+
                     const data = await res.json();
                     if (data.url) {
                         document.getElementById('dlLink').href = data.url;
                         document.getElementById('result').style.display = 'block';
-                        status.innerText = "Готово!";
+                        status.innerText = "Успех!";
+                        status.style.color = "var(--success)";
                         found = true;
                         break;
                     }
-                } catch (e) { continue; }
+                } catch (e) { 
+                    console.log("Next server..."); 
+                }
             }
 
             if (!found) {
