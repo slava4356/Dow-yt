@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Get-Save | v2.5.1</title>
+    <title>Get-Save | v2.6.0</title>
     <style>
         :root {
             --bg: #030712;
@@ -36,7 +36,6 @@
             background: rgba(255, 255, 255, 0.05);
             padding: 4px 10px;
             border-radius: 20px;
-            pointer-events: none;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
@@ -120,7 +119,10 @@
             font-size: 17px;
             font-weight: 700;
             cursor: pointer;
+            transition: opacity 0.3s;
         }
+
+        button:disabled { opacity: 0.6; cursor: wait; }
 
         #result {
             display: none;
@@ -142,33 +144,44 @@
             font-weight: bold;
         }
 
-        #status { margin-top: 15px; font-size: 13px; color: var(--text-dim); min-height: 20px; }
+        #status { margin-top: 15px; font-size: 13px; color: var(--text-dim); min-height: 20px; line-height: 1.5; }
+        
+        .error-btn {
+            background: #374151;
+            margin-top: 10px;
+            font-size: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            border: none;
+        }
     </style>
 </head>
 <body>
 
-    <div class="version-tag">v2.5.1</div>
+    <div class="version-tag">v2.6.0</div>
 
     <div class="container">
         <h1>Get-Save</h1>
-        <div class="subtitle">Умный выбор сервера</div>
+        <div class="subtitle">Улучшенная стабильность</div>
 
         <div class="selector-container">
             <div id="slider" class="slider"></div>
             <div class="option active" onclick="setMode(0)">Cobalt</div>
-            <div class="option" onclick="setMode(1)">AIO Dev</div>
-            <div class="option" onclick="setMode(2)">SaveFrom</div>
+            <div class="option" onclick="setMode(1)">Mirror</div>
+            <div class="option" onclick="setMode(2)">SafeMode</div>
         </div>
 
         <input type="text" id="urlInput" placeholder="Вставьте ссылку...">
 
-        <button id="mainBtn" onclick="handleAction()">ПОЛУЧИТЬ ФАЙЛ</button>
+        <button id="mainBtn" onclick="handleAction()">СКАЧАТЬ</button>
 
         <div id="status"></div>
 
         <div id="result">
-            <div style="font-weight: bold; color: var(--success);">Файл готов!</div>
-            <a id="dlLink" href="#" target="_blank" class="dl-link">СКАЧАТЬ</a>
+            <div style="font-weight: bold; color: var(--success);">Файл найден!</div>
+            <a id="dlLink" href="#" target="_blank" class="dl-link">СОХРАНИТЬ ВИДЕО</a>
         </div>
     </div>
 
@@ -182,7 +195,7 @@
                 opt.classList.toggle('active', idx === m);
             });
             document.getElementById('result').style.display = 'none';
-            document.getElementById('status').innerText = '';
+            document.getElementById('status').innerHTML = '';
         }
 
         async function handleAction() {
@@ -194,23 +207,28 @@
             if (!url) return;
 
             btn.disabled = true;
-            status.innerText = "Связь с сервером...";
+            status.innerHTML = "Пытаемся обойти защиту...<br><small>Это может занять до 15 секунд</small>";
             status.style.color = "var(--text-dim)";
             result.style.display = "none";
 
             if (mode < 2) {
-                // Пытаемся использовать Cobalt или альтернативный сервер
-                const api = mode === 0 ? 'https://api.cobalt.tools/api/json' : 'https://api.download.yt/api/json';
+                // Пытаемся использовать разные точки входа Cobalt
+                const apiList = [
+                    'https://api.cobalt.tools/api/json',
+                    'https://cobalt.api.unblocker.it/api/json',
+                    'https://api.vve.cc/api/json'
+                ];
                 
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд на ответ
+                let success = false;
+                
+                // Пробуем сервера по очереди
+                const targetApi = mode === 0 ? apiList[0] : apiList[1];
 
-                    const response = await fetch(api, {
+                try {
+                    const response = await fetch(targetApi, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                        body: JSON.stringify({ url: url, vQuality: "720" }),
-                        signal: controller.signal
+                        body: JSON.stringify({ url: url, vQuality: "720" })
                     });
 
                     const data = await response.json();
@@ -219,20 +237,19 @@
                         document.getElementById('dlLink').href = data.url;
                         result.style.display = "block";
                         status.innerText = "Готово!";
-                    } else {
-                        status.innerText = "Сервер не нашел видео. Попробуйте SaveFrom.";
-                        status.style.color = "var(--error)";
+                        success = true;
                     }
                 } catch (e) {
-                    status.innerText = "Сервер не отвечает (ошибка сети). Используйте SaveFrom.";
-                    status.style.color = "var(--error)";
+                    console.error("Server error");
+                }
+
+                if (!success) {
+                    status.innerHTML = "<span style='color:var(--error)'>Все серверы перегружены.</span><br>Попробуйте режим SafeMode или подождите.";
                 }
             } else {
-                status.innerText = "Открываем SaveFrom...";
-                setTimeout(() => {
-                    const cleanUrl = url.replace(/https?:\/\//, '');
-                    window.open(`https://ru.savefrom.net/#url=http://${cleanUrl}`, '_blank');
-                }, 500);
+                status.innerText = "Инициализация SafeMode...";
+                const cleanUrl = url.replace(/https?:\/\//, '');
+                window.open(`https://ru.savefrom.net/#url=http://${cleanUrl}`, '_blank');
             }
             btn.disabled = false;
         }
